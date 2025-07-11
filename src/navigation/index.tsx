@@ -2,8 +2,6 @@ import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import Home from '../screens/home';
-import Login from '../screens/login';
-import EditTask from '../screens/editTask';
 import { ActivityIndicator, View, StyleSheet, ViewStyle } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 
@@ -45,26 +43,12 @@ const RootStack: React.FC = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
-        {userToken ? (
-          <>
-            <Stack.Screen
+        <Stack.Screen
               name="Home"
               component={Home}
               options={{ title: 'My Tasks' }}
             />
-            <Stack.Screen
-              name="EditTask"
-              component={EditTask}
-              options={{ title: 'Edit Task' }}
-            />
-          </>
-        ) : (
-          <Stack.Screen
-            name="Login"
-            component={Login}
-            options={{ headerShown: false }}
-          />
-        )}
+       
       </Stack.Navigator>
     </NavigationContainer>
   );
