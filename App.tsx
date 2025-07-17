@@ -4,14 +4,11 @@ import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import RootStack from './src/navigation';
 import color from './src/theme/colors';
-import { ThemeProvider } from './src/context/ThemeContext';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <ThemeProvider>
-
     <SafeAreaProvider>
       <SafeAreaView
         style={[
@@ -22,8 +19,6 @@ function App(): React.JSX.Element {
         <RootStack />
       </SafeAreaView>
     </SafeAreaProvider>
-    </ThemeProvider>
-
   );
 }
 

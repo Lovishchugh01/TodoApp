@@ -3,9 +3,7 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import Home from '../screens/home';
 import {StyleSheet, ViewStyle} from 'react-native';
-import Details from '../screens/details';
 import {RootStackParamList} from '../utils/type';
-import Favorites from '../screens/favourites';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -21,8 +19,6 @@ const RootStack: React.FC = () => {
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
         <Stack.Screen name="Home" component={Home} />
-        <Stack.Screen name="Details" component={Details} />
-        <Stack.Screen name="Favorites" component={Favorites} />
       </Stack.Navigator>
     </NavigationContainer>
   );

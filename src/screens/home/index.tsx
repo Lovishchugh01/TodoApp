@@ -1,233 +1,226 @@
-// screens/index.tsx
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
-  SafeAreaView,
-  FlatList,
   View,
   Text,
   TextInput,
-  ActivityIndicator,
-  TouchableOpacity,
-  Image,
+  Button,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator
 } from 'react-native';
-import axios from 'axios';
-import {useNavigation} from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Picker} from '@react-native-picker/picker';
-import {useTheme} from '../../context/ThemeContext';
-import Icon from 'react-native-vector-icons/Ionicons';
-import {getStyles} from './styles';
+import io from 'socket.io-client';
+import NetInfo from '@react-native-community/netinfo';
 
-export interface Country {
-  name: {
-    common: string;
-    official: string;
-  };
-  flags: {
-    png: string;
-    svg: string;
-  };
-  region: string;
-  population?: number;
-  languages?: Record<string, string>;
-  currencies?: Record<string, {name: string; symbol: string}>;
-  timezones?: string[];
-}
+const SERVER_PORT = 3000;
 
-const Home = () => {
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [filteredCountries, setFilteredCountries] = useState<Country[]>([]);
+const App = () => {
+  const [ticket, setTicket] = useState('');
+  const [queue, setQueue] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [serverIP, setServerIP] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState<string>('all');
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const navigation = useNavigation();
-  const [regions, setRegions] = useState<string[]>([]);
-  const {theme, toggleTheme} = useTheme();
-  const styles = getStyles(theme);
+  const socketRef = useRef(null);
 
-  const fetchCountries = async () => {
-    try {
-      const response = await axios.get(
-        'https://restcountries.com/v3.1/all?fields=name,flags,region,population,languages,currencies,timezones',
-      );
-      const data = response.data;
-      setCountries(data);
-      setFilteredCountries(data);
-
-      // Extract unique regions
-      const uniqueRegions = Array.from(
-        new Set(data.map((country: Country) => country.region)),
-      );
-      setRegions(['all', ...uniqueRegions]);
-
-      // Load favorites
-      const storedFavorites = await AsyncStorage.getItem('favorites');
-      if (storedFavorites) {
-        setFavorites(JSON.parse(storedFavorites));
-      }
-    } catch (err) {
-      setError('Failed to fetch countries. Please try again.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch countries data
   useEffect(() => {
-    fetchCountries();
+    const detectNetwork = async () => {
+      try {
+        const state = await NetInfo.fetch();
+        
+        if (state?.isConnected && state?.details) {
+          let ip = state?.details?.ipAddress;
+          let gateway = state?.details?.gateway;
+          
+          const potentialIPs = [
+            gateway,
+            ip.split('.').slice(0, 3).join('.') + '.100',
+            '192.168.1.100',
+            '10.0.2.2'
+          ];
+
+          for (const potentialIP of potentialIPs) {
+            try {
+              const testSocket = io(`http://${potentialIP}:${SERVER_PORT}`, {
+                transports: ['websocket'],
+                timeout: 2000,
+                reconnectionAttempts: 1
+              });
+
+              await new Promise((resolve, reject) => {
+                testSocket.on('connect', () => {
+                  testSocket.disconnect();
+                  resolve(potentialIP);
+                });
+                
+                testSocket.on('connect_error', () => {
+                  reject(new Error('Connection failed'));
+                });
+
+                setTimeout(() => reject(new Error('Timeout')), 2000);
+              });
+
+              setServerIP(potentialIP);
+              initializeSocket(potentialIP);
+              return;
+            } catch (e) {
+              console.log(`Failed to connect to ${potentialIP}`);
+            }
+          }
+          throw new Error('Could not detect server IP');
+        } else {
+          throw new Error('No network connection');
+        }
+      } catch (error) {
+        setLoading(false);
+      }
+    };
+
+    const initializeSocket = (ip) => {
+      const socket = io(`http://${ip}:${SERVER_PORT}`, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        setIsConnected(true);
+        setLoading(false);
+      });
+
+      socket.on('disconnect', () => {
+        setIsConnected(false);
+      });
+
+      socket.on('queue-update', (updatedQueue) => {
+        setQueue(updatedQueue);
+      });
+
+      socket.on('current-ticket', (currentTicket) => {
+        setCurrent(currentTicket);
+      });
+
+      socket.on('connect_error', (err) => {
+        setLoading(false);
+        setIsConnected(false);
+      });
+    };
+
+    detectNetwork();
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
   }, []);
 
-  // Filter and search countries
-  useEffect(() => {
-    let result = countries;
-
-    // Filter by region
-    if (selectedRegion !== 'all') {
-      result = result.filter(country => country.region === selectedRegion);
+  const addTicket = () => {
+    if (ticket.trim() && socketRef.current) {
+      socketRef.current.emit('add-ticket', ticket.trim());
+      setTicket('');
     }
-
-    // Search by name
-    if (searchText) {
-      result = result.filter(country =>
-        country.name.common.toLowerCase().includes(searchText.toLowerCase()),
-      );
-    }
-
-    setFilteredCountries(result);
-  }, [searchText, selectedRegion, countries]);
-
-  // Toggle favorite
-  const toggleFavorite = async (countryName: string) => {
-    const newFavorites = {
-      ...favorites,
-      [countryName]: !favorites[countryName],
-    };
-    setFavorites(newFavorites);
-    await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
   };
 
-  // Render each country item
-  const renderItem = useCallback(
-    ({item}: {item: Country}) => (
-      <TouchableOpacity
-        style={styles.countryItem}
-        onPress={() => navigation.navigate('Details', {country: item})}>
-        <Image source={{uri: item.flags.png}} style={styles.flag} />
-        <View style={styles.countryInfo}>
-          <Text style={styles.countryName}>{item.name.common}</Text>
-          <Text style={styles.region}>{item.region}</Text>
-        </View>
-        <TouchableOpacity onPress={() => toggleFavorite(item.name.common)}>
-          <Icon
-            name={favorites[item.name.common] ? 'star' : 'star-outline'}
-            size={24}
-            color={
-              favorites[item.name.common]
-                ? 'gold'
-                : theme === 'dark'
-                ? '#aaa'
-                : '#666'
-            }
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    ),
-    [favorites, navigation, styles, theme],
-  );
+  const callNext = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('call-next');
+    }
+  };
 
-  // Retry fetching data
-  const retryFetch = () => {
-    setLoading(true);
-    setError(null);
-    fetchCountries();
+  const closeTicket = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('close-ticket');
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View
-        style={[
-          styles.errorContainer,
-          theme === 'dark' && styles.darkContainer,
-        ]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={retryFetch} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.loadingText}>
+          {serverIP ? `Connecting to ${serverIP}...` : 'Detecting network...'}
+        </Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search countries"
-          placeholderTextColor={theme === 'dark' ? '#aaa' : '#666'}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedRegion}
-            style={styles.regionPicker}
-            onValueChange={itemValue => setSelectedRegion(itemValue)}
-            dropdownIconColor={theme === 'dark' ? '#fff' : '#000'}
-            mode="dropdown">
-            {regions.map(region => (
-              <Picker.Item
-                key={region}
-                label={region === 'all' ? 'All Regions' : region}
-                value={region}
-                color={theme === 'dark' ? '#fff' : '#000'}
-              />
-            ))}
-          </Picker>
-        </View>
-        <TouchableOpacity
-          style={styles.FavouriteContainer}
-          onPress={() => navigation.navigate('Favorites')}>
-          <Icon
-            name="heart"
-            size={20}
-            color={theme === 'dark' ? '#ff5555' : '#ff0000'}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.FavouriteContainer}
-          onPress={toggleTheme}
-          activeOpacity={0.7}>
-          <Icon
-            name={theme === 'light' ? 'moon-outline' : 'sunny-outline'}
-            size={20}
-            color={theme === 'light' ? '#000' : '#FFD700'}
-          />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <Text style={styles.title}>Queue Calling System</Text>
+      
+      <Text style={[styles.connectionStatus, {color: isConnected ? 'green' : 'red'}]}>
+        Status: {isConnected ? `Connected to ${serverIP}` : 'Disconnected'}
+      </Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Ticket ID"
+        value={ticket}
+        onChangeText={setTicket}
+        onSubmitEditing={addTicket}
+      />
+      <Button title="Generate" onPress={addTicket} disabled={!isConnected} />
+    
+      <Text style={styles.sectionTitle}>Currently Serving:</Text>
+      <Text style={styles.currentTicket}>{current || 'None'}</Text>
+
+      <View style={styles.buttonRow}>
+        <Button title="Next" onPress={callNext} disabled={!isConnected} />
+        <Button title="Close" onPress={closeTicket} disabled={!isConnected} />
       </View>
 
+      <Text style={styles.sectionTitle}>Visitors in Queue:</Text>
       <FlatList
-        data={filteredCountries}
-        renderItem={renderItem}
-        keyExtractor={item => item.name.common}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No countries found</Text>
-          </View>
-        }
+        data={queue}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({item}) => <Text style={styles.ticket}>{item}</Text>}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
-export default Home;
+const styles = StyleSheet.create({
+  container: {padding: 20, flex: 1, backgroundColor: '#fff'},
+  loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingText: {marginTop: 10, fontSize: 16},
+  title: {fontSize: 22, fontWeight: 'bold', marginBottom: 10, color: '#333'},
+  connectionStatus: {marginBottom: 10},
+  input: {
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 10,
+    color: '#333',
+    borderRadius: 5,
+    borderColor: '#ccc'
+  },
+  sectionTitle: {
+    marginTop: 20,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  currentTicket: {
+    fontSize: 32,
+    textAlign: 'center',
+    marginVertical: 10,
+    color: '#333',
+    fontWeight: 'bold'
+  },
+  ticket: {
+    fontSize: 18,
+    padding: 10,
+    color: '#333',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10
+  }
+});
+
+export default App;

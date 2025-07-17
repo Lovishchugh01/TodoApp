@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {useTheme} from '../context/ThemeContext';
 
 interface BackButtonProps {
   title?: string;
@@ -30,15 +29,8 @@ const BackButton: React.FC<BackButtonProps> = ({
   textStyle,
   iconSize = 24,
   showIcon = true,
-  iconColor, // No default here - we'll handle it below
-  textColor, // No default here - we'll handle it below
 }) => {
   const navigation = useNavigation();
-  const {theme} = useTheme();
-
-  // Determine colors based on theme if not explicitly provided
-  const resolvedIconColor = iconColor ?? (theme === 'dark' ? '#fff' : '#000');
-  const resolvedTextColor = textColor ?? (theme === 'dark' ? '#fff' : '#000');
 
   const handlePress = () => {
     if (onPress) {
@@ -53,13 +45,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   return (
     <TouchableOpacity
       onPress={handlePress}
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme === 'dark' ? '#333' : '#fff',
-        },
-        style,
-      ]}
+      style={[styles.container, style]}
       activeOpacity={0.7}
       accessibilityLabel="Go back"
       accessibilityRole="button">
@@ -67,19 +53,11 @@ const BackButton: React.FC<BackButtonProps> = ({
         <Icon
           name="chevron-back"
           size={iconSize}
-          color={resolvedIconColor}
+          color={'#000'}
           style={styles.icon}
         />
       )}
-      {title && (
-        <Text style={[
-          styles.text, 
-          {color: resolvedTextColor},
-          textStyle
-        ]}>
-          {title}
-        </Text>
-      )}
+      {title && <Text style={[styles.text, textStyle]}>{title}</Text>}
     </TouchableOpacity>
   );
 };
@@ -90,6 +68,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     marginLeft: -4,
+    backgroundColor: '#fff',
   },
   icon: {
     marginRight: 4,
@@ -97,6 +76,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#000',
   },
 });
 
