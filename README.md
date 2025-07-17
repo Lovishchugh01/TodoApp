@@ -1,52 +1,7 @@
-# Countries Explorer App 🌍
-
-A feature-rich mobile application built with React Native and TypeScript that allows users to explore country information from around the world.
-
-## ✨ Features
-
-- **Comprehensive Country Data**:
-  - Country flags
-  - Official names
-  - Regions (Asia, Africa, Europe, etc.)
-  - Population data
-  - Languages and currencies
-  - Timezones
-
-- **Intuitive Search**:
-  - Search countries by name
-  - Real-time filtering as you type
-
-- **Smart Filtering**:
-  - Filter by continent/region (Africa, Americas, Asia, Europe, Oceania)
-  - "All Regions" option to reset filters
-
-- **Dark Mode Support**:
-  - Beautiful dark theme for comfortable night-time browsing
-  - Automatic theme switching
-
-- **Favorites System**:
-  - Star favorite countries
-  - Persistent storage of favorites
-  - Dedicated favorites view
-
-- **Detailed Country View**:
-  - Navigate to see comprehensive country details
-  - Clean, organized information presentation
-
-## 🛠️ Technical Implementation
-
-- Built with React Native and TypeScript
-- Uses REST Countries API for data
-- AsyncStorage for persistent favorites
-- React Navigation for smooth transitions
-- Custom theme context for dark/light mode
-- Responsive design for all screen sizes
-
-## 📱 Installation
 
 ```bash
 # Clone the specific branch
-git clone -b CountriesExplorerApp https://github.com/Lovishchugh01/TodoApp.git
+git clone -b QueueCallingSystem https://github.com/Lovishchugh01/TodoApp.git
 cd TodoApp
 
 # Install dependencies
@@ -54,6 +9,10 @@ yarn install
 
 # For iOS only
 cd ios && pod install && cd ..
+
+# For Running Server
+cd backend
+node server.js
 
 # Getting Started
 
