@@ -1,179 +1,233 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, SafeAreaView, TouchableOpacity } from 'react-native';
-import { styles } from './styles';
+// screens/index.tsx
+import React, {useState, useEffect, useCallback} from 'react';
+import {
+  SafeAreaView,
+  FlatList,
+  View,
+  Text,
+  TextInput,
+  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
+import axios from 'axios';
+import {useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Picker} from '@react-native-picker/picker';
+import {useTheme} from '../../context/ThemeContext';
+import Icon from 'react-native-vector-icons/Ionicons';
+import {getStyles} from './styles';
 
-// Define types for the price data we receive from Binance
-type PriceData = {
-  s: string;          // Symbol
-  c: string;          // Last price
-  P: string;          // Price change percent
-  q: string;          // Quote volume
-  l: string;          // Low price
-  h: string;          // High price
-  timestamp: string;   // Last update time
-  previousPrice?: string; // Previous price for comparison
-};
+export interface Country {
+  name: {
+    common: string;
+    official: string;
+  };
+  flags: {
+    png: string;
+    svg: string;
+  };
+  region: string;
+  population?: number;
+  languages?: Record<string, string>;
+  currencies?: Record<string, {name: string; symbol: string}>;
+  timezones?: string[];
+}
 
-const App = () => {
-  const [priceData, setPriceData] = useState<PriceData[]>([]);
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [symbols] = useState<string[]>([
-    'btcusdt',
-    'ethusdt',
-    'bnbusdt',
-    'solusdt',
-    'xrpusdt',
-    'adausdt',
-    'dogeusdt',
-    'dotusdt',
-    'avaxusdt',
-    'linkusdt'
-  ]);
+const Home = () => {
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [filteredCountries, setFilteredCountries] = useState<Country[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const navigation = useNavigation();
+  const [regions, setRegions] = useState<string[]>([]);
+  const {theme, toggleTheme} = useTheme();
+  const styles = getStyles(theme);
 
+  const fetchCountries = async () => {
+    try {
+      const response = await axios.get(
+        'https://restcountries.com/v3.1/all?fields=name,flags,region,population,languages,currencies,timezones',
+      );
+      const data = response.data;
+      setCountries(data);
+      setFilteredCountries(data);
+
+      // Extract unique regions
+      const uniqueRegions = Array.from(
+        new Set(data.map((country: Country) => country.region)),
+      );
+      setRegions(['all', ...uniqueRegions]);
+
+      // Load favorites
+      const storedFavorites = await AsyncStorage.getItem('favorites');
+      if (storedFavorites) {
+        setFavorites(JSON.parse(storedFavorites));
+      }
+    } catch (err) {
+      setError('Failed to fetch countries. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch countries data
   useEffect(() => {
-    const ws = new WebSocket('wss://stream.binance.com:9443/ws/!ticker@arr');
+    fetchCountries();
+  }, []);
 
-    ws.onopen = () => {
-      console.log('WebSocket Connected');
-      setSocket(ws);
+  // Filter and search countries
+  useEffect(() => {
+    let result = countries;
+
+    // Filter by region
+    if (selectedRegion !== 'all') {
+      result = result.filter(country => country.region === selectedRegion);
+    }
+
+    // Search by name
+    if (searchText) {
+      result = result.filter(country =>
+        country.name.common.toLowerCase().includes(searchText.toLowerCase()),
+      );
+    }
+
+    setFilteredCountries(result);
+  }, [searchText, selectedRegion, countries]);
+
+  // Toggle favorite
+  const toggleFavorite = async (countryName: string) => {
+    const newFavorites = {
+      ...favorites,
+      [countryName]: !favorites[countryName],
     };
-
-    ws.onmessage = (e: any) => {
-      try {
-        const data = JSON.parse(e.data) as PriceData[];
-        const filteredData = data.filter(item => symbols.includes(item.s.toLowerCase()));
-        
-        setPriceData(prevData => {
-          const newData = [...prevData];
-          
-          filteredData.forEach(item => {
-            const existingIndex = newData.findIndex(d => d.s === item.s);
-            const now = new Date();
-            const timestamp = now.toLocaleTimeString();
-            
-            if (existingIndex >= 0) {
-              newData[existingIndex] = {
-                ...item,
-                timestamp,
-                previousPrice: newData[existingIndex].c,
-              };
-            } else {
-              newData.push({
-                ...item,
-                timestamp,
-                previousPrice: item.c,
-              });
-            }
-          });
-          
-          return newData.sort((a, b) => a.s.localeCompare(b.s));
-        });
-      } catch (error) {
-        console.error('Error parsing WebSocket data:', error);
-      }
-    };
-
-    ws.onerror = (e: Event) => {
-      console.log('WebSocket Error:', e);
-    };
-
-    ws.onclose = (e: any) => {
-      console.log('WebSocket Disconnected:', e.code, e.reason);
-    };
-
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, [symbols]);
-
-  const getPriceChangeColor = (currentPrice: string, previousPrice?: string): string => {
-    if (!previousPrice) return '#000';
-    const current = parseFloat(currentPrice);
-    const previous = parseFloat(previousPrice);
-    return current > previous ? '#16c784' : current < previous ? '#ea3943' : '#000';
+    setFavorites(newFavorites);
+    await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
   };
 
-  const formatPrice = (price: string): string => {
-    const num = parseFloat(price);
-    if (num < 1) return num.toFixed(6);
-    if (num < 10) return num.toFixed(4);
-    if (num < 1000) return num.toFixed(2);
-    return num.toFixed(0);
-  };
-
-  const renderItem = ({ item }: { item: PriceData }) => {
-    const symbol = item.s.replace('USDT', '/USDT').toUpperCase();
-    const priceColor = getPriceChangeColor(item.c, item.previousPrice);
-    const change24h = parseFloat(item.P);
-    const isPositive = change24h >= 0;
-    
-    return (
-      <TouchableOpacity activeOpacity={0.8}>
-        <View style={[
-          styles.card,
-          isPositive ? styles.positiveCard : styles.negativeCard
-        ]}>
-          <View style={styles.cardHeader}>
-            <View style={styles.symbolContainer}>
-              <Text style={styles.symbol}>{symbol}</Text>
-              <Text style={styles.volume}>Vol: ${(parseFloat(item.q) / 1000000).toFixed(2)}M</Text>
-            </View>
-            <View style={styles.priceContainer}>
-              <Text style={[styles.price, { color: priceColor }]}>
-                ${formatPrice(item.c)}
-              </Text>
-              <View style={[
-                styles.change24hBadge,
-                isPositive ? styles.positiveBadge : styles.negativeBadge
-              ]}>
-                <Text style={styles.change24hText}>
-                  {isPositive ? '↑' : '↓'} {Math.abs(change24h).toFixed(2)}%
-                </Text>
-              </View>
-            </View>
-          </View>
-          
-          <View style={styles.cardFooter}>
-            <View style={styles.priceChangeContainer}>
-              <Text style={styles.priceChangeLabel}>24h Range:</Text>
-              <Text style={styles.priceChangeValue}>
-                ${formatPrice(item.l)} - ${formatPrice(item.h)}
-              </Text>
-            </View>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
-          </View>
+  // Render each country item
+  const renderItem = useCallback(
+    ({item}: {item: Country}) => (
+      <TouchableOpacity
+        style={styles.countryItem}
+        onPress={() => navigation.navigate('Details', {country: item})}>
+        <Image source={{uri: item.flags.png}} style={styles.flag} />
+        <View style={styles.countryInfo}>
+          <Text style={styles.countryName}>{item.name.common}</Text>
+          <Text style={styles.region}>{item.region}</Text>
         </View>
+        <TouchableOpacity onPress={() => toggleFavorite(item.name.common)}>
+          <Icon
+            name={favorites[item.name.common] ? 'star' : 'star-outline'}
+            size={24}
+            color={
+              favorites[item.name.common]
+                ? 'gold'
+                : theme === 'dark'
+                ? '#aaa'
+                : '#666'
+            }
+          />
+        </TouchableOpacity>
       </TouchableOpacity>
-    );
+    ),
+    [favorites, navigation, styles, theme],
+  );
+
+  // Retry fetching data
+  const retryFetch = () => {
+    setLoading(true);
+    setError(null);
+    fetchCountries();
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View
+        style={[
+          styles.errorContainer,
+          theme === 'dark' && styles.darkContainer,
+        ]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={retryFetch} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>Crypto Tracker</Text>
-        <Text style={styles.subHeader}>Real-time prices from Binance</Text>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search countries"
+          placeholderTextColor={theme === 'dark' ? '#aaa' : '#666'}
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={selectedRegion}
+            style={styles.regionPicker}
+            onValueChange={itemValue => setSelectedRegion(itemValue)}
+            dropdownIconColor={theme === 'dark' ? '#fff' : '#000'}
+            mode="dropdown">
+            {regions.map(region => (
+              <Picker.Item
+                key={region}
+                label={region === 'all' ? 'All Regions' : region}
+                value={region}
+                color={theme === 'dark' ? '#fff' : '#000'}
+              />
+            ))}
+          </Picker>
+        </View>
+        <TouchableOpacity
+          style={styles.FavouriteContainer}
+          onPress={() => navigation.navigate('Favorites')}>
+          <Icon
+            name="heart"
+            size={20}
+            color={theme === 'dark' ? '#ff5555' : '#ff0000'}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.FavouriteContainer}
+          onPress={toggleTheme}
+          activeOpacity={0.7}>
+          <Icon
+            name={theme === 'light' ? 'moon-outline' : 'sunny-outline'}
+            size={20}
+            color={theme === 'light' ? '#000' : '#FFD700'}
+          />
+        </TouchableOpacity>
       </View>
-      
+
       <FlatList
-        data={priceData}
+        data={filteredCountries}
         renderItem={renderItem}
-        keyExtractor={(item) => item.s}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+        keyExtractor={item => item.name.common}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No countries found</Text>
+          </View>
+        }
       />
-      
-      <View style={[
-        styles.statusBar,
-        socket ? styles.connectedStatus : styles.connectingStatus
-      ]}>
-        <Text style={styles.statusText}>
-          {socket ? '✓ Connected to Binance WebSocket' : 'Connecting to Binance...'}
-        </Text>
-      </View>
     </SafeAreaView>
   );
 };
 
-export default App;
+export default Home;

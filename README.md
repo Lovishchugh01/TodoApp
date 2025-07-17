@@ -1,43 +1,52 @@
-# Binance Price Tracker 📈
+# Countries Explorer App 🌍
 
-![App Screenshot](https://drive.google.com/uc?id=1TqYCrcXsfkkbcs-3Jm04r0aoN51dpGw2)
-
-A real-time cryptocurrency price tracking mobile app built with React Native and TypeScript, connecting directly to Binance's WebSocket API.
+A feature-rich mobile application built with React Native and TypeScript that allows users to explore country information from around the world.
 
 ## ✨ Features
 
-- **Live Price Updates**: Real-time streaming of cryptocurrency prices
-- **Visual Indicators**: 
-  - 🟢 Green for price increases
-  - 🔴 Red for price decreases
-- **Comprehensive Data**:
-  - Current price with precision formatting
-  - 24-hour percentage change
-  - Trading volume (in millions)
-  - Price range (high/low)
-- **Clean UI**: Card-based layout with intuitive design
-- **Connection Monitoring**: Real-time WebSocket status
+- **Comprehensive Country Data**:
+  - Country flags
+  - Official names
+  - Regions (Asia, Africa, Europe, etc.)
+  - Population data
+  - Languages and currencies
+  - Timezones
 
-## 📱 Supported Cryptocurrencies
+- **Intuitive Search**:
+  - Search countries by name
+  - Real-time filtering as you type
 
-| Pair       | Symbol    |
-|------------|-----------|
-| Bitcoin    | BTC/USDT  |
-| Ethereum   | ETH/USDT  |
-| Binance Coin | BNB/USDT |
-| Solana     | SOL/USDT  |
-| Ripple     | XRP/USDT  |
-| Cardano    | ADA/USDT  |
-| Dogecoin   | DOGE/USDT |
-| Polkadot   | DOT/USDT  |
-| Avalanche  | AVAX/USDT |
-| Chainlink  | LINK/USDT |
+- **Smart Filtering**:
+  - Filter by continent/region (Africa, Americas, Asia, Europe, Oceania)
+  - "All Regions" option to reset filters
 
-## 🛠️ Installation
+- **Dark Mode Support**:
+  - Beautiful dark theme for comfortable night-time browsing
+  - Automatic theme switching
+
+- **Favorites System**:
+  - Star favorite countries
+  - Persistent storage of favorites
+  - Dedicated favorites view
+
+- **Detailed Country View**:
+  - Navigate to see comprehensive country details
+  - Clean, organized information presentation
+
+## 🛠️ Technical Implementation
+
+- Built with React Native and TypeScript
+- Uses REST Countries API for data
+- AsyncStorage for persistent favorites
+- React Navigation for smooth transitions
+- Custom theme context for dark/light mode
+- Responsive design for all screen sizes
+
+## 📱 Installation
 
 ```bash
 # Clone the specific branch
-git clone -b BinancePriceTracker https://github.com/Lovishchugh01/TodoApp.git
+git clone -b CountriesExplorerApp https://github.com/Lovishchugh01/TodoApp.git
 cd TodoApp
 
 # Install dependencies
@@ -45,6 +54,7 @@ yarn install
 
 # For iOS only
 cd ios && pod install && cd ..
+
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.

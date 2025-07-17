@@ -1,9 +1,11 @@
-export type RootStackParamList = {
-  Home:undefined;
-  Login:undefined
-  EditTask: { task: Task };
-};
+import { Country } from "../screens/home";
 
+export type RootStackParamList = {
+  Home: undefined;
+  Details: {country: Country};
+    Favorites: undefined;
+
+};
 
 export type Task = {
   id: string;
